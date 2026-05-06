@@ -40,7 +40,7 @@ jobs:
 
       - name: Build Image
         run: |
-          docker build -t $IMAGE_NAME:latest .
+          docker build -t $IMAGE_NAME:latest -f deployments/docker/Dockerfile.
 
       - name: Push Image
         run: |
