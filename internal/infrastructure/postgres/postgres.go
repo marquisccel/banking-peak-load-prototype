@@ -25,6 +25,12 @@ func New(dsn string) (*sqlx.DB, error) {
 	cfg.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 	sqlDB := stdlib.OpenDB(*cfg)
 	db := sqlx.NewDb(sqlDB, "pgx")
+
+	db.SetMaxOpenConns(20)
+	db.SetMaxIdleConns(10)
+	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetConnMaxIdleTime(1 * time.Minute)
+
 	if err := db.PingContext(ctx); err != nil {
 		return nil, err
 	}

@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgbouncer-config
+  namespace: banking
+data:
+  pgbouncer.ini: |
+    [databases]
+    banking = host=postgres port=5432 dbname=banking
+
+    [pgbouncer]
+    listen_addr        = 0.0.0.0
+    listen_port        = 6432
+    auth_type          = trust
+    auth_file          = /etc/pgbouncer/userlist.txt
+    pool_mode          = transaction
+    max_client_conn    = 2000
+    default_pool_size  = 50
+    min_pool_size      = 10
+    reserve_pool_size  = 25
+    reserve_pool_timeout = 3
+    server_idle_timeout  = 600
+    client_idle_timeout  = 0
+    max_db_connections   = 80
+    server_reset_query = DISCARD ALL
+    logfile            =
+    pidfile            =
+    log_connections    = 0
+    log_disconnections = 0
+    log_pooler_errors  = 1
+    server_check_query = SELECT 1
+    ignore_startup_parameters = extra_float_digits
+
+  userlist.txt: |
+    "postgres" "postgres"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pgbouncer
+  namespace: banking
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pgbouncer
+  template:
+    metadata:
+      labels:
+        app: pgbouncer
+    spec:
+      containers:
+        - name: pgbouncer
+          image: edoburu/pgbouncer:v1.25.1-p0
+          ports:
+            - containerPort: 6432
+
+          volumeMounts:
+            - name: config
+              mountPath: /etc/pgbouncer
+
+      volumes:
+        - name: config
+          configMap:
+            name: pgbouncer-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgbouncer
+  namespace: banking
+spec:
+  selector:
+    app: pgbouncer
+  ports:
+    - port: 6432
+      targetPort: 6432
