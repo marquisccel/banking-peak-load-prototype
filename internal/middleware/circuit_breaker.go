@@ -21,6 +21,10 @@ func CircuitBreaker(cfg *config.Config) echo.MiddlewareFunc {
 		return func(next echo.HandlerFunc) echo.HandlerFunc { return next }
 	}
 
+	const dependency = "api"
+	metrics.CircuitBreakerState.WithLabelValues(dependency).Set(circuitBreakerStateValue(gobreaker.StateClosed))
+	metrics.CircuitBreakerOpen.Set(0)
+
 	cb := gobreaker.NewCircuitBreaker(gobreaker.Settings{
 		Name:        "api",
 		MaxRequests: 1, // allow 1 probe in half-open state
@@ -30,6 +34,7 @@ func CircuitBreaker(cfg *config.Config) echo.MiddlewareFunc {
 			return int(counts.ConsecutiveFailures) >= cfg.CBMaxFailures
 		},
 		OnStateChange: func(_ string, _ gobreaker.State, to gobreaker.State) {
+			metrics.CircuitBreakerState.WithLabelValues(dependency).Set(circuitBreakerStateValue(to))
 			if to == gobreaker.StateOpen {
 				metrics.CircuitBreakerOpen.Set(1)
 			} else {
@@ -56,5 +61,16 @@ func CircuitBreaker(cfg *config.Config) echo.MiddlewareFunc {
 			}
 			return cbErr
 		}
+	}
+}
+
+func circuitBreakerStateValue(state gobreaker.State) float64 {
+	switch state {
+	case gobreaker.StateOpen:
+		return 1
+	case gobreaker.StateHalfOpen:
+		return 2
+	default:
+		return 0
 	}
 }

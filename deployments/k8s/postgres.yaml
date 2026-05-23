@@ -1,4 +1,16 @@
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-hba-config
+  namespace: banking
+data:
+  pg_hba.conf: |
+    local   all             all                             trust
+    host    all             all             all             trust
+    host    replication     all             all             trust
+
+---
+apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: postgres-pvc
@@ -40,6 +52,8 @@ spec:
             - "work_mem=4MB"
             - "-c"
             - "synchronous_commit=off"
+            - "-c"
+            - "hba_file=/etc/postgresql/pg_hba.conf"
           ports:
             - containerPort: 5432
               name: postgres
@@ -62,16 +76,21 @@ spec:
                 secretKeyRef:
                   name: banking-secret
                   key: POSTGRES_DB
-            
+
             - name: POSTGRES_INITDB_ARGS
               value: "--encoding=UTF8"
 
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
 
+            - name: POSTGRES_HOST_AUTH_METHOD
+              value: trust
+
           volumeMounts:
             - name: postgres-storage
               mountPath: /var/lib/postgresql/data
+            - name: postgres-hba
+              mountPath: /etc/postgresql
 
           readinessProbe:
             exec:
@@ -103,6 +122,9 @@ spec:
         - name: postgres-storage
           persistentVolumeClaim:
             claimName: postgres-pvc
+        - name: postgres-hba
+          configMap:
+            name: postgres-hba-config
 
 ---
 apiVersion: v1
@@ -113,7 +135,99 @@ metadata:
 spec:
   selector:
     app: postgres
+  ports:
+    - port: 5432
+      targetPort: postgres
+      name: postgres
 
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-replica
+  namespace: banking
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-replica
+  template:
+    metadata:
+      labels:
+        app: postgres-replica
+    spec:
+      containers:
+        - name: postgres-replica
+          image: postgres:16-alpine
+          args:
+            - "-c"
+            - "max_connections=200"
+            - "-c"
+            - "shared_buffers=512MB"
+            - "-c"
+            - "effective_cache_size=1GB"
+            - "-c"
+            - "work_mem=4MB"
+          env:
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: banking-secret
+                  key: POSTGRES_USER
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: banking-secret
+                  key: POSTGRES_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /var/lib/postgresql/data/pgdata
+              chown -R postgres:postgres /var/lib/postgresql/data
+              if [ ! -s /var/lib/postgresql/data/pgdata/PG_VERSION ]; then
+                su-exec postgres pg_basebackup -h postgres -U postgres -D /var/lib/postgresql/data/pgdata -Fp -Xs -R -P
+              fi
+              chmod 700 /var/lib/postgresql/data/pgdata
+              exec su-exec postgres postgres -D /var/lib/postgresql/data/pgdata -c max_connections=200
+          ports:
+            - containerPort: 5432
+              name: postgres
+          volumeMounts:
+            - name: postgres-replica-storage
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 30
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 40
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+      volumes:
+        - name: postgres-replica-storage
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-replica
+  namespace: banking
+spec:
+  selector:
+    app: postgres-replica
   ports:
     - port: 5432
       targetPort: postgres

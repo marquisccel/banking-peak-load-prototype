@@ -50,7 +50,7 @@ func declareQueues(ch *amqp.Channel) error {
 		return fmt.Errorf("declare dlq: %w", err)
 	}
 	args := amqp.Table{
-		"x-dead-letter-exchange": "",
+		"x-dead-letter-exchange":    "",
 		"x-dead-letter-routing-key": "transactions.dlq",
 	}
 	if _, err := ch.QueueDeclare("transactions", true, false, false, false, args); err != nil {
@@ -104,4 +104,17 @@ func (c *Client) Consume(queue string) (<-chan amqp.Delivery, error) {
 		return nil, err
 	}
 	return ch.Consume(queue, "", false, false, false, false, nil)
+}
+
+// QueueDepth returns the number of messages currently waiting in the given queue.
+func (c *Client) QueueDepth(queue string) (int64, error) {
+	ch, err := c.getChannel()
+	if err != nil {
+		return 0, err
+	}
+	q, err := ch.QueueInspect(queue)
+	if err != nil {
+		return 0, fmt.Errorf("inspect queue %s: %w", queue, err)
+	}
+	return int64(q.Messages), nil
 }

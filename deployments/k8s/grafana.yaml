@@ -10,10 +10,30 @@ data:
 
     datasources:
       - name: Prometheus
+        uid: prometheus
         type: prometheus
         access: proxy
         url: http://prometheus:9090
         isDefault: true
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provider
+  namespace: banking
+
+data:
+  dashboard.yaml: |
+    apiVersion: 1
+
+    providers:
+      - name: Banking Peak Load
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 10
+        options:
+          path: /var/lib/grafana/dashboards
 
 ---
 apiVersion: apps/v1
@@ -50,9 +70,18 @@ spec:
             - name: GF_SECURITY_ADMIN_PASSWORD
               value: admin
 
+            - name: GF_USERS_ALLOW_SIGN_UP
+              value: "false"
+
           volumeMounts:
             - name: datasource
               mountPath: /etc/grafana/provisioning/datasources
+
+            - name: dashboard-provider
+              mountPath: /etc/grafana/provisioning/dashboards
+
+            - name: dashboard
+              mountPath: /var/lib/grafana/dashboards
 
           resources:
             requests:
@@ -67,6 +96,14 @@ spec:
         - name: datasource
           configMap:
             name: grafana-datasource
+
+        - name: dashboard-provider
+          configMap:
+            name: grafana-dashboard-provider
+
+        - name: dashboard
+          configMap:
+            name: grafana-dashboard
 
 ---
 apiVersion: v1

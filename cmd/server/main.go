@@ -16,8 +16,8 @@ import (
 	infraqueue "github.com/ahargunyllib/banking-peak-load-prototype/internal/infrastructure/queue"
 	infraredis "github.com/ahargunyllib/banking-peak-load-prototype/internal/infrastructure/redis"
 	"github.com/ahargunyllib/banking-peak-load-prototype/internal/logger"
-	appmw "github.com/ahargunyllib/banking-peak-load-prototype/internal/middleware"
 	"github.com/ahargunyllib/banking-peak-load-prototype/internal/metrics"
+	appmw "github.com/ahargunyllib/banking-peak-load-prototype/internal/middleware"
 	"github.com/ahargunyllib/banking-peak-load-prototype/internal/repository/memory"
 	pgrepo "github.com/ahargunyllib/banking-peak-load-prototype/internal/repository/postgres"
 	"github.com/ahargunyllib/banking-peak-load-prototype/internal/service"
@@ -101,8 +101,9 @@ func main() {
 	txHandler := handler.NewTransactionHandler(txSvc)
 
 	e := echo.New()
-	e.Logger = logger.L                    // route Echo's internal logs through our slog JSON logger
-	e.Use(middleware.BodyLimit(2_097_152)) // 2MB
+	e.Logger = logger.L                          // route Echo's internal logs through our slog JSON logger
+	e.Use(echoprometheus.NewMiddleware("banking_api")) // gather HTTP metrics for all later middleware, including 429s
+	e.Use(middleware.BodyLimit(2_097_152))       // 2MB
 	e.Use(middleware.ContextTimeout(60 * time.Second))
 	// e.Use(middleware.CORS("https://example.com")) // Allow CORS from frontend domain in real deployment
 	// e.Use(middleware.CSRF()) // Enable in real deployment with proper config (cookie name, same-site, etc.)
@@ -111,7 +112,16 @@ func main() {
 		Level: 5,
 	}))
 	if cfg.RateLimitEnabled {
-		e.Use(middleware.RateLimiter(middleware.NewRateLimiterMemoryStore(cfg.RateLimitRPS)))
+		e.Use(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
+			Store: middleware.NewRateLimiterMemoryStoreWithConfig(middleware.RateLimiterMemoryStoreConfig{
+				Rate:  cfg.RateLimitRPS,
+				Burst: cfg.RateLimitBurst,
+			}),
+			DenyHandler: func(c *echo.Context, identifier string, err error) error {
+				metrics.RateLimiterDrops.WithLabelValues("global").Inc()
+				return middleware.ErrRateLimitExceeded.Wrap(err)
+			},
+		}))
 	}
 	e.Use(middleware.Recover())
 	e.Use(appmw.CircuitBreaker(&cfg))
@@ -119,7 +129,6 @@ func main() {
 	e.Use(appmw.RequestLogger())  // wide event canonical log line
 	e.Use(middleware.Secure())
 
-	e.Use(echoprometheus.NewMiddleware("myapp"))   // adds middleware to gather metrics
 	e.GET("/metrics", echoprometheus.NewHandler()) // adds route to serve gathered metrics
 
 	e.GET("/api/v1/accounts/:id/balance", accountHandler.GetBalance)
@@ -129,27 +138,61 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM) // start shutdown process on signal
 	defer cancel()
 
+	go metrics.StartRuntimeCollector(ctx, 5*time.Second)
+
 	if cfg.QueueEnabled && queueClient != nil && db != nil {
 		w := worker.NewWorker(db, queueClient, redisClient, txRepo)
 		go w.Start(ctx, cfg.QueueWorkers)
 	}
 
-	if db != nil {
-		go func() {
-			t := time.NewTicker(5 * time.Second)
-			defer t.Stop()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-t.C:
+	go func() {
+		collect := func() {
+			if db != nil {
+				pingCtx, pingCancel := context.WithTimeout(ctx, 2*time.Second)
+				if err := db.PingContext(pingCtx); err != nil {
+					metrics.DependencyUp.WithLabelValues("database").Set(0)
+				} else {
+					metrics.DependencyUp.WithLabelValues("database").Set(1)
 					s := db.Stats()
 					metrics.DBConnectionsActive.Set(float64(s.InUse))
 					metrics.DBConnectionsIdle.Set(float64(s.Idle))
 				}
+				pingCancel()
 			}
-		}()
-	}
+
+			if redisClient != nil {
+				pingCtx, pingCancel := context.WithTimeout(ctx, 2*time.Second)
+				if err := redisClient.Ping(pingCtx).Err(); err != nil {
+					metrics.DependencyUp.WithLabelValues("redis").Set(0)
+				} else {
+					metrics.DependencyUp.WithLabelValues("redis").Set(1)
+				}
+				pingCancel()
+			}
+
+			if queueClient != nil {
+				depth, err := queueClient.QueueDepth("transactions")
+				if err != nil {
+					metrics.DependencyUp.WithLabelValues("rabbitmq").Set(0)
+					return
+				}
+				metrics.DependencyUp.WithLabelValues("rabbitmq").Set(1)
+				metrics.QueueDepth.WithLabelValues("transactions").Set(float64(depth))
+			}
+		}
+
+		collect()
+		t := time.NewTicker(5 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				collect()
+			}
+		}
+	}()
 
 	sc := echo.StartConfig{
 		Address:         fmt.Sprintf(":%d", cfg.AppPort),

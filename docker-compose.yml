@@ -77,12 +77,12 @@ services:
       - ./deployments/pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
       - ./deployments/pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
     command: ["pgbouncer", "/etc/pgbouncer/pgbouncer.ini"]
-    ports: ["6432:6432"]
+    ports: ["6432:5432"]
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -d banking"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -d banking"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -131,6 +131,22 @@ services:
     depends_on: [app]
     networks: [banking-net]
 
+  grafana:
+    image: grafana/grafana:12.0.2
+    profiles: [observability]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./deployments/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./deployments/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./deployments/grafana/dashboard:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports: ["3000:3000"]
+    depends_on: [prometheus]
+    networks: [banking-net]
+
 networks:
   banking-net:
     driver: bridge
@@ -140,3 +156,4 @@ volumes:
   postgres-replica-data:
   rabbitmq-data:
   prometheus-data:
+  grafana-data:
