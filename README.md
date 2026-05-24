@@ -39,11 +39,11 @@ This prototype demonstrates how **four layered protection mechanisms** bring the
 
 Grafana Dashboard:
 
-![Dashboard](docs/grafana-screenshot.jpeg)
+![Dashboard](docs/grafana-screenshot.png)
 
 k6 Load Test:
 
-![k6 Load Test](docs/k6-loadtest-screenshot.jpeg)
+![k6 Load Test](docs/k6-loadtest-screenshot.png)
 
 ---
 
