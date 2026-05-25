@@ -22,6 +22,7 @@ Thumbs.db
 # Environment
 .env
 .env.local
+.env.cloud
 .env.*
 !.env.example
 !.env.baseline.example

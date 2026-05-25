@@ -89,3 +89,23 @@ k8s-seed:
 
 k8s-load-test:
 	BASE_URL=$(K8S_BASE_URL) k6 run scripts/load-test/mixed.js
+
+ifneq (,$(wildcard .env.cloud))
+include .env.cloud
+export
+endif
+
+cloud-demo:
+	bash scripts/cloud/demo.sh
+
+cloud-load-test:
+	bash scripts/cloud/loadtest.sh
+
+cloud-health:
+	bash scripts/cloud/health.sh
+
+cloud-logs:
+	bash scripts/cloud/logs.sh
+
+cloud-cleanup:
+	bash scripts/cloud/cleanup.sh

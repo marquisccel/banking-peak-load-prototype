@@ -71,7 +71,7 @@ func (s *transactionService) CreateTransaction(ctx context.Context, input Create
 	now := time.Now()
 
 	// Generate ID in txn<22-digit> format to match seeded data and mixed.js queries.
-	// Counter wraps at 1_000_000 (seed size) so status queries hit real seeded rows.
+	// Counter starts after seeded transaction range to avoid ID collisions.
 	
 	seq := int64(1_000_000) + txCounter.Add(1)
 	tx := &transaction.Transaction{
