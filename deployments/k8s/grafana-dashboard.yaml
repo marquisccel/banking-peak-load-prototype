@@ -123,7 +123,7 @@ data:
           },
           "targets": [
             {
-              "expr": "(sum(rate(banking_api_requests_total{code=~"4..|5.."}[5m])) or vector(0))/sum(rate(banking_api_requests_total[5m]))",
+              "expr": "(sum(rate(banking_api_requests_total{code=~\"4..|5..\"}[5m])) or vector(0))/sum(rate(banking_api_requests_total[5m]))",
               "legendFormat": "Error Rate",
               "refId": "A"
             }
