@@ -101,9 +101,9 @@ func main() {
 	txHandler := handler.NewTransactionHandler(txSvc)
 
 	e := echo.New()
-	e.Logger = logger.L                          // route Echo's internal logs through our slog JSON logger
+	e.Logger = logger.L                                // route Echo's internal logs through our slog JSON logger
 	e.Use(echoprometheus.NewMiddleware("banking_api")) // gather HTTP metrics for all later middleware, including 429s
-	e.Use(middleware.BodyLimit(2_097_152))       // 2MB
+	e.Use(middleware.BodyLimit(2_097_152))             // 2MB
 	e.Use(middleware.ContextTimeout(60 * time.Second))
 	// e.Use(middleware.CORS("https://example.com")) // Allow CORS from frontend domain in real deployment
 	// e.Use(middleware.CSRF()) // Enable in real deployment with proper config (cookie name, same-site, etc.)

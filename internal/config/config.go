@@ -23,8 +23,8 @@ type Config struct {
 	DBReadReplicaEnabled  bool    `env:"DB_READ_REPLICA_ENABLED" envDefault:"false"`
 
 	// Database
-	DBPrimaryDSN    string `env:"DB_PRIMARY_DSN"`
-	PgBouncerDSN    string `env:"PGBOUNCER_DSN"`
+	DBPrimaryDSN     string `env:"DB_PRIMARY_DSN"`
+	PgBouncerDSN     string `env:"PGBOUNCER_DSN"`
 	PgBouncerReadDSN string `env:"PGBOUNCER_READ_DSN"`
 
 	// Redis
