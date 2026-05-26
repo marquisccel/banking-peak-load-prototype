@@ -1,7 +1,8 @@
 <h1 align="center">Banking Peak Load Prototype</h1>
 
 <p align="center">
-  A university prototype demonstrating defense-in-depth scalability for banking peak load — simulating CIMB Niaga's problem of 1M transactions/hour without crashing.
+  A university capstone demonstrating defense-in-depth scalability for banking peak load —<br/>
+  simulating CIMB Niaga's problem of 1M transactions/hour without crashing.
 </p>
 
 <p align="center">
@@ -12,6 +13,7 @@
   <img src="https://img.shields.io/badge/RabbitMQ-Queue-FF6600?style=flat-square&logo=rabbitmq&logoColor=white" />
   <img src="https://img.shields.io/badge/Kubernetes-K8s-326CE5?style=flat-square&logo=kubernetes&logoColor=white" />
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white" />
+  <img src="https://img.shields.io/badge/Terraform-AWS-7B42BC?style=flat-square&logo=terraform&logoColor=white" />
   <img src="https://img.shields.io/badge/Prometheus-Grafana-E6522C?style=flat-square&logo=prometheus&logoColor=white" />
   <img src="https://img.shields.io/badge/k6-Load%20Testing-7D64FF?style=flat-square&logo=k6&logoColor=white" />
 </p>
@@ -22,11 +24,13 @@
 
 A major bank experiences system crashes during peak load: **1M transactions/hour causing >20% error rate, >10s latency, and cost spikes**. Root causes: no backpressure, DB connection exhaustion, heavy queries without caching, and reactive (not proactive) scaling.
 
-This prototype demonstrates how **four layered protection mechanisms** bring the system from unstable to production-grade.
+This prototype demonstrates how **four layered protection mechanisms** bring the system from unstable to production-grade — and validates the results across three deployment targets: Docker Compose, Kubernetes, and AWS (Terraform).
 
 ---
 
 ## Results
+
+### Kubernetes Load Test
 
 | Metric | Baseline | Optimized | Improvement |
 |---|---|---|---|
@@ -37,13 +41,23 @@ This prototype demonstrates how **four layered protection mechanisms** bring the
 | Cache Hit Rate | N/A | **> 80%** | — |
 | Availability | — | **100%** | — |
 
-Grafana Dashboard:
+**Grafana dashboard — Kubernetes:**
 
-![Dashboard](docs/grafana-screenshot.png)
+![k8s Grafana](docs/k8s-grafana.png)
 
-k6 Load Test:
+**k6 load test output — Kubernetes:**
 
-![k6 Load Test](docs/k6-loadtest-screenshot.png)
+![k8s k6](docs/k8s-k6.png)
+
+### Cloud (AWS EC2) Load Test
+
+**Grafana dashboard — Cloud:**
+
+![Cloud Grafana](docs/cloud-grafana.png)
+
+**k6 load test output — Cloud:**
+
+![Cloud k6](docs/cloud-k6.jpeg)
 
 ---
 
@@ -100,13 +114,13 @@ Client Request
 
 | Component | Technology |
 |---|---|
-| Language | Go 1.25 + Echo router |
+| Language | Go 1.25 + Echo v5 router |
 | Database | PostgreSQL 16 + PgBouncer (transaction pooling) |
 | Cache | Redis 7 (cache-aside pattern) |
-| Message Queue | RabbitMQ |
-| Observability | Prometheus + Grafana |
+| Message Queue | RabbitMQ 3 |
+| Observability | Prometheus v3 + Grafana 12 |
 | Load Testing | k6 |
-| Infrastructure | Docker Compose (profile-based) + Kubernetes |
+| Infrastructure | Docker Compose (profile-based) + Kubernetes + Terraform (AWS) |
 | CI | GitHub Actions |
 | Dev tooling | air (live reload), golangci-lint, Nix flake |
 
@@ -116,7 +130,7 @@ Client Request
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/api/v1/transactions` | Create transaction (async when queue enabled) |
+| `POST` | `/api/v1/transactions` | Create transaction (async when queue enabled, returns HTTP 202 + TX ID) |
 | `GET` | `/api/v1/transactions/:id/status` | Transaction status inquiry |
 | `GET` | `/api/v1/accounts/:id/balance` | Account balance inquiry |
 
@@ -131,16 +145,20 @@ All protection layers are toggled via environment variables — baseline = all o
 | `CACHE_ENABLED` | `false` | Redis cache for read path |
 | `QUEUE_ENABLED` | `false` | Async write via message queue |
 | `RATE_LIMIT_ENABLED` | `false` | Token bucket rate limiting |
+| `RATE_LIMIT_RPS` | `100` | Requests per second per client |
+| `RATE_LIMIT_BURST` | `200` | Burst allowance |
 | `CIRCUIT_BREAKER_ENABLED` | `false` | Fail-fast on unhealthy downstream |
+| `CB_MAX_FAILURES` | `5` | Failures before circuit opens |
+| `CB_TIMEOUT_SECONDS` | `10` | Duration circuit stays open |
 | `DB_READ_REPLICA_ENABLED` | `false` | Route reads to replica |
 
 See [Development Guide](docs/development.md) for the full environment variable reference.
 
 ---
 
-## Quick Start
+## Quick Start (Docker Compose)
 
-**Prerequisites:** Go 1.25, Docker & Docker Compose v2, k6, Make. For Kubernetes, also install `kubectl` and run a local cluster such as minikube or kind.
+**Prerequisites:** Go 1.25, Docker & Docker Compose v2, k6, Make.
 
 ```bash
 # Install Go tooling
@@ -155,33 +173,18 @@ make seed
 
 ```bash
 # Baseline (API + PostgreSQL only)
-cp .env.baseline.example .env
-docker compose up -d
+make up
 k6 run scripts/load-test/mixed.js
 
-# Optimized (+ Redis, RabbitMQ, read replica)
-cp .env.optimized.example .env
-docker compose --profile optimized up -d
+# Optimized (+ Redis, RabbitMQ, read replica, PgBouncer)
+make up-optimized
 k6 run scripts/load-test/mixed.js
 
 # Full stack (+ Prometheus, Grafana)
-docker compose --profile optimized --profile observability up -d
-# Grafana:    http://localhost:3000
+docker compose --profile optimized --profile observability up -d --build
+# Grafana:    http://localhost:3000  (admin/admin)
 # Prometheus: http://localhost:9090
 ```
-
----
-
-## Load Test Scripts
-
-| Script | Traffic Model | Use it for |
-|---|---|---|
-| `scripts/load-test/mixed.js` | Realistic 70% read / 30% write workload. Reads split between balance inquiry and transaction status, with a hot-read pool to exercise Redis cache hits. | Main baseline vs optimized demo, Grafana validation, SLO checks for read p95 < 500ms and write p95 < 2s. |
-| `scripts/load-test/optimized.js` | Write-only ramping load up to 1000 req/s against `POST /api/v1/transactions`. | Focused optimized write-path test, async queue, rate limiter, and write latency. |
-| `scripts/load-test/rampup.js` | Write-only gradual ramp, configurable by `INITIAL_RATE`, `RATE_STEP`, `STAGE_DURATION`, and `MAX_STAGES`. | Finding the saturation point and watching when latency/errors start rising. |
-| `scripts/load-test/spike.js` | Write-only short spike with increasing arrival rate. | Verifying protection behavior such as HTTP 429 rate limiting and HTTP 503 circuit breaking. |
-| `scripts/load-test/sustained.js` | Write-only constant high load, default 800 req/s for 30 minutes. | Long-running stability checks for PgBouncer, RabbitMQ workers, and DB write pressure. |
-| `scripts/load-test/full.js` | Write-only combined ramp-up, spike, and sustained phases. | End-to-end stress rehearsal when you want all write-pressure phases in one run. |
 
 ---
 
@@ -190,17 +193,33 @@ docker compose --profile optimized --profile observability up -d
 | Command | Services |
 |---|---|
 | `docker compose up` | API + PostgreSQL (baseline) |
-| `docker compose --profile optimized up` | + Redis, RabbitMQ, read replica, PgBouncer |
+| `docker compose --profile optimized up` | + Redis, RabbitMQ, PgBouncer |
 | `docker compose --profile observability up` | + Prometheus, Grafana |
 | `docker compose --profile optimized --profile observability up` | Full stack |
 
 ---
 
+## Load Test Scripts
+
+| Script | Traffic Model | Use it for |
+|---|---|---|
+| `scripts/load-test/mixed.js` | Realistic 70% read / 30% write. Reads split between balance inquiry and transaction status, with a hot-read pool to exercise Redis cache hits. | Main baseline vs optimized demo, Grafana validation, SLO checks. |
+| `scripts/load-test/optimized.js` | Write-only ramping up to 1000 req/s against `POST /api/v1/transactions`. | Focused optimized write-path test: async queue, rate limiter, write latency. |
+| `scripts/load-test/rampup.js` | Write-only gradual ramp, configurable via `INITIAL_RATE`, `RATE_STEP`, `STAGE_DURATION`, `MAX_STAGES`. | Finding the saturation point. |
+| `scripts/load-test/spike.js` | Write-only short spike with increasing arrival rate. | Verifying HTTP 429 rate limiting and HTTP 503 circuit breaking. |
+| `scripts/load-test/sustained.js` | Write-only constant 800 req/s for 30 minutes. | Long-running stability: PgBouncer, RabbitMQ workers, DB write pressure. |
+| `scripts/load-test/full.js` | Combined ramp-up, spike, and sustained phases. | End-to-end write stress rehearsal in one run. |
+| `scripts/load-test/status.js` | Transaction status polling. | Validating async TX completion and cache effectiveness. |
+
+---
+
 ## Kubernetes
 
-Kubernetes manifests are included under `deployments/k8s/` for demonstrating the same prototype stack in a cluster. Covers the app, PostgreSQL (primary + replica), PgBouncer, Redis, RabbitMQ, Prometheus, Grafana, ConfigMap/Secret, namespace, and HPA.
+Manifests are in `deployments/k8s/` and cover the full stack: app, PostgreSQL primary + replica, PgBouncer, Redis, RabbitMQ, Prometheus, Grafana, ConfigMap, Secret, namespace, and HPA (3–15 replicas, CPU target 50%).
 
-### Demo Steps
+**Prerequisites:** `kubectl` + a local cluster (minikube or kind). For HPA metrics, `metrics-server` must be installed.
+
+### Deploy
 
 ```bash
 # 1. Start cluster
@@ -213,10 +232,10 @@ make k8s-up
 make k8s-status
 ```
 
-Open **4 separate terminals** for monitoring:
+### Port-forward (open 4 terminals)
 
 ```bash
-# Terminal 1 — App
+# Terminal 1 — App → http://localhost:8080
 make k8s-port-forward
 
 # Terminal 2 — Grafana → http://localhost:3000 (admin/admin)
@@ -225,65 +244,170 @@ make k8s-port-forward-grafana
 # Terminal 3 — Prometheus → http://localhost:9090
 make k8s-port-forward-prometheus
 
-# Terminal 4 — Watch auto-scaling live
+# Terminal 4 — Watch HPA autoscaling live
 kubectl get hpa -n banking -w
 ```
 
-Seed data (requires Terminal 1 port-forward running):
+### Seed & load test
 
 ```bash
-make k8s-port-forward-db   # new terminal
+# Requires Terminal 1 running
+make k8s-port-forward-db   # new terminal — forwards postgres to localhost:15432
 make k8s-seed
-```
 
-Run load test:
-
-```bash
+# Run load test against the cluster
 make k8s-load-test
 ```
 
-Shutdown:
+### Teardown & resume
 
 ```bash
-kubectl scale deployment banking-app pgbouncer postgres redis rabbitmq prometheus grafana --replicas=0 -n banking
+# Teardown
+kubectl scale deployment banking-app pgbouncer postgres redis rabbitmq prometheus grafana \
+  --replicas=0 -n banking
 minikube stop
-```
 
-Resume next session:
-
-```bash
+# Resume next session
 minikube start
 make k8s-up
-make k8s-status   # wait until all Running
+make k8s-status   # wait until all pods are Running
 ```
 
-**If data is missing (account not found / insufficient funds):**
+### Reseed after restart
+
+If accounts are missing or balances are wrong after a restart:
 
 ```bash
-kubectl exec -it deployment/postgres -n banking -- psql -U postgres -d banking -c "TRUNCATE TABLE transactions, accounts RESTART IDENTITY CASCADE;"
+kubectl exec -it deployment/postgres -n banking -- \
+  psql -U postgres -d banking -c \
+  "TRUNCATE TABLE transactions, accounts RESTART IDENTITY CASCADE;"
+
 make k8s-port-forward-db   # terminal 1
 make k8s-seed              # terminal 2
 ```
 
-> **Note:** The app manifest pulls `marquisccel/banking-peak-load:latest`. For local code changes, build and push your own image and update `deployments/k8s/app.yaml`. The HPA requires `metrics-server`; without it the app still runs but autoscaling metrics will not be available.
+> **Note:** The app manifest pulls `marquisccel/banking-peak-load:latest`. For local code changes, build and push your own image and update `deployments/k8s/app.yaml`.
 
 ---
 
-## Kubernetes Manifests
+## Cloud Demo (AWS via Terraform)
+
+The `deployments/terraform/cloud-demo/` module provisions two EC2 instances on AWS Learner Lab:
+
+- **App server** — Banking API + PostgreSQL + Redis + RabbitMQ + PgBouncer + Prometheus + Grafana, all via Docker Compose. Auto-seeds 100K accounts and 1M transactions on first boot.
+- **k6 runner** — Remote load generator.
+
+### Prerequisites
+
+1. Start AWS Learner Lab and update `~/.aws/credentials`.
+2. Verify credentials:
+
+```bash
+aws sts get-caller-identity
+```
+
+3. Ensure an SSH key exists (or generate one):
+
+```bash
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
+```
+
+### Deploy
+
+```bash
+cd deployments/terraform/cloud-demo
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars: set aws_region, instance type, SSH key path, etc.
+terraform init
+terraform apply
+```
+
+Wait **5–10 minutes** for cloud-init to finish seeding data.
+
+### Verify readiness
+
+```bash
+# Get URLs
+terraform output -raw api_url
+terraform output -raw grafana_url
+terraform output -raw prometheus_url
+
+# SSH into app server and check
+$(terraform output -raw ssh_app_command)
+cloud-init status --long
+ls -l /home/ubuntu/cloud-demo-ready
+cd banking-peak-load-prototype
+docker compose ps
+docker compose exec -T postgres psql -U postgres -d banking \
+  -c "SELECT COUNT(*) FROM accounts;"       # expected: 100000
+docker compose exec -T postgres psql -U postgres -d banking \
+  -c "SELECT COUNT(*) FROM transactions;"   # expected: 1000000
+```
+
+All services (`app`, `postgres`, `redis`, `rabbitmq`, `pgbouncer`, `prometheus`, `grafana`) should be `Up`.
+
+### Run load test
+
+```bash
+# Run mixed load test from the k6 runner
+$(terraform output -raw run_mixed_command)
+
+# Or SSH into the runner manually
+$(terraform output -raw ssh_k6_command)
+/home/ubuntu/run-mixed.sh
+```
+
+### Makefile shortcuts (after copying .env.cloud)
+
+```bash
+cp .env.cloud.example .env.cloud
+# Set SERVER_IP in .env.cloud
+
+make cloud-demo        # SSH + start optimized stack on app server
+make cloud-load-test   # Run load test from k6 runner
+make cloud-health      # Check service health
+make cloud-logs        # Tail app server logs
+make cloud-cleanup     # Stop all services on app server
+```
+
+### Troubleshoot
+
+```bash
+# On app server
+$(terraform output -raw ssh_app_command)
+docker compose logs app --tail=80
+curl http://localhost:8080/metrics | head
+curl http://localhost:9090/-/ready
+
+# If Grafana shows "No data", verify Prometheus first
+curl "http://localhost:9090/api/v1/query?query=banking_api_requests_total"
+# Then run the load test for at least 2–3 minutes before checking dashboards.
+```
+
+### Destroy
+
+```bash
+terraform destroy
+```
+
+---
+
+## Kubernetes Manifests Reference
 
 | File | Description |
 |---|---|
+| `namespace.yaml` | `banking` namespace |
 | `secret.yaml` | DB credentials (base64 encoded) |
 | `configmap.yaml` | App configuration and feature flags |
-| `app.yaml` | Banking app deployment + NodePort service |
-| `hpa.yaml` | Horizontal Pod Autoscaler (3–15 replicas, CPU 50%) |
+| `app.yaml` | Banking app Deployment + NodePort service |
+| `hpa.yaml` | HPA: 3–15 replicas, CPU target 50%, scale-up +3 pods/30s |
 | `pgbouncer.yaml` | PgBouncer connection pooler (2 replicas, pool size 50) |
-| `postgres.yaml` | PostgreSQL primary + replica with tuned parameters |
-| `redis.yaml` | Redis cache (LRU, 256MB) |
+| `postgres.yaml` | PostgreSQL primary + streaming replica with tuned parameters |
+| `redis.yaml` | Redis (LRU eviction, 256MB max memory) |
 | `rabbitmq.yaml` | RabbitMQ message broker |
-| `prometheus.yaml` | Metrics collection |
+| `prometheus.yaml` | Prometheus metrics collection |
 | `grafana.yaml` | Grafana deployment |
-| `grafana-dashboard.yaml` | Grafana dashboard provisioning ConfigMap |
+| `grafana-dashboard.yaml` | Dashboard provisioning ConfigMap |
 
 ---
 
@@ -291,25 +415,33 @@ make k8s-seed              # terminal 2
 
 | Command | Description |
 |---|---|
-| `make init` | Download Go modules and install dev tools (air, golangci-lint) |
+| `make init` | Download Go modules + install air, golangci-lint |
 | `make dev` | Start server with live reload (air) |
 | `make lint` | Run golangci-lint |
 | `make test` | Run unit tests (`go test -v ./...`) |
 | `make build` | Compile binary to `bin/app` |
 | `make seed` | Seed 100K accounts + 1M transactions (Docker Compose) |
-| `make up` | Start the baseline Docker Compose stack |
-| `make up-optimized` | Start the optimized Docker Compose stack |
+| `make up` | Copy `.env.baseline.example` → `.env` and start baseline stack |
+| `make up-optimized` | Copy `.env.optimized.example` → `.env` and start optimized stack |
+| `make down` | Stop all Compose services (all profiles) |
 | `make load-test` | Run mixed k6 workload against `http://localhost:8080` |
+| `make logs` | Follow Docker Compose logs |
+| `make ps` | Show Docker Compose service status |
 | `make k8s-up` | Apply all Kubernetes manifests |
 | `make k8s-down` | Delete the Kubernetes stack |
-| `make k8s-status` | Show pods, services, and HPA status |
-| `make k8s-logs` | Follow logs from the banking-app deployment |
-| `make k8s-port-forward` | Forward app service to `http://localhost:8080` |
-| `make k8s-port-forward-db` | Forward PostgreSQL to `localhost:15432` for seeding |
-| `make k8s-port-forward-prometheus` | Forward Prometheus to `http://localhost:9090` |
-| `make k8s-port-forward-grafana` | Forward Grafana to `http://localhost:3000` |
+| `make k8s-status` | Show pods, services, and HPA |
+| `make k8s-logs` | Follow logs from `banking-app` deployment |
+| `make k8s-port-forward` | Forward app → `http://localhost:8080` |
+| `make k8s-port-forward-db` | Forward PostgreSQL → `localhost:15432` |
+| `make k8s-port-forward-prometheus` | Forward Prometheus → `http://localhost:9090` |
+| `make k8s-port-forward-grafana` | Forward Grafana → `http://localhost:3000` |
 | `make k8s-seed` | Seed data through the forwarded PostgreSQL service |
 | `make k8s-load-test` | Run mixed k6 workload against the Kubernetes app |
+| `make cloud-demo` | Start optimized stack on the cloud app server |
+| `make cloud-load-test` | Run load test from the cloud k6 runner |
+| `make cloud-health` | Check health of cloud services |
+| `make cloud-logs` | Tail logs on the cloud app server |
+| `make cloud-cleanup` | Stop services on the cloud app server |
 
 ---
 
@@ -322,7 +454,7 @@ make k8s-seed              # terminal 2
 | Error Rate at peak | > 20% | < 1% | **0.00%** ✅ |
 | Read Success Rate | < 80% | > 99% | **100%** ✅ |
 | Write Success Rate | < 80% | > 99% | **100%** ✅ |
-| Cache Hit Rate | N/A | > 80% | > 80% ✅ |
+| Cache Hit Rate | N/A | > 80% | **> 80%** ✅ |
 | Availability | — | 99.5% | **100%** ✅ |
 
 ---
@@ -332,30 +464,67 @@ make k8s-seed              # terminal 2
 ```
 banking-peak-load-prototype/
 ├── cmd/
-│   ├── server/main.go          # Entry point
-│   └── seeds/main.go           # Data seeder
+│   ├── server/main.go              # Entry point
+│   └── seeds/main.go              # Data seeder (100K accounts, 1M transactions)
 ├── internal/
-│   ├── config/                 # Env-based configuration
-│   ├── domain/                 # Domain models (account, transaction)
-│   ├── handler/                # HTTP handlers
-│   ├── infrastructure/         # DB, Redis, Queue clients
-│   ├── middleware/             # Rate limiter, circuit breaker, logging
-│   ├── metrics/                # Prometheus metric definitions
-│   ├── repository/             # DB access + cache-aside logic
-│   ├── service/                # Business logic
-│   └── worker/                 # Queue consumer worker
-├── migrations/                 # SQL migrations
+│   ├── config/                    # Env-based configuration (caarlos0/env)
+│   ├── domain/                    # Domain models: account, transaction
+│   ├── handler/                   # HTTP handlers + request types
+│   ├── infrastructure/            # DB (pgx/sqlx), Redis, RabbitMQ clients
+│   ├── middleware/                # Rate limiter (token bucket), circuit breaker, logging
+│   ├── metrics/                   # Prometheus metric definitions + resource metrics
+│   ├── repository/                # DB access: postgres + in-memory implementations
+│   ├── service/                   # Business logic: sync/async transaction paths
+│   └── worker/                    # RabbitMQ consumer worker
+├── migrations/                    # SQL migrations (golang-migrate)
 ├── scripts/
-│   └── load-test/              # k6 scripts (mixed, optimized, spike, sustained, etc.)
+│   ├── load-test/                 # k6 scripts: mixed, rampup, spike, sustained, full, optimized, status
+│   └── cloud/                    # Cloud helper scripts: demo, loadtest, health, logs, cleanup
 ├── deployments/
-│   ├── docker/                 # Dockerfiles
-│   ├── k8s/                    # Kubernetes manifests
-│   ├── pgbouncer/              # PgBouncer config
-│   ├── prometheus/             # prometheus.yml
-│   └── grafana/                # Dashboard JSON provisioning
-├── docs/                       # PRD, Architecture, ADRs
+│   ├── docker/Dockerfile
+│   ├── k8s/                       # Kubernetes manifests (full stack)
+│   ├── terraform/cloud-demo/      # Terraform: AWS EC2 app server + k6 runner
+│   ├── pgbouncer/                 # pgbouncer.ini + userlist.txt
+│   ├── postgres/                  # pg_hba.conf
+│   ├── prometheus/                # prometheus.yml
+│   └── grafana/                   # Dashboard JSON + provisioning config
+├── docs/                          # PRD, Architecture, ADRs, screenshots
+│   ├── architecture.md
+│   ├── development.md
+│   ├── prd.md
+│   ├── workflow.md
+│   ├── k8s-grafana.png            # Grafana dashboard — Kubernetes run
+│   ├── k8s-k6.png                 # k6 output — Kubernetes run
+│   ├── cloud-grafana.png          # Grafana dashboard — Cloud (AWS) run
+│   └── cloud-k6.jpeg              # k6 output — Cloud (AWS) run
+├── .env.baseline.example
+├── .env.optimized.example
+├── .env.cloud.example
+├── docker-compose.yml
 ├── Makefile
-└── docker-compose.yml
+└── go.mod                         # Go 1.25, Echo v5, pgx/v5, go-redis v9, amqp091-go
+```
+
+---
+
+## Testing
+
+```bash
+# Unit tests
+make test
+
+# Integration tests (requires docker compose up)
+go test -tags=integration ./...
+
+# Load tests (Docker Compose)
+k6 run scripts/load-test/mixed.js
+k6 run scripts/load-test/spike.js
+
+# Load tests (Kubernetes)
+make k8s-load-test
+
+# Load tests (Cloud)
+make cloud-load-test
 ```
 
 ---
@@ -365,30 +534,15 @@ banking-peak-load-prototype/
 | Document | Description |
 |---|---|
 | [PRD](docs/prd.md) | Problem statement, requirements, success criteria |
-| [Architecture](docs/architecture.md) | System design, read/write paths, DB schema |
-| [Development Guide](docs/development.md) | Setup, env vars, conventions |
+| [Architecture](docs/architecture.md) | System design, read/write paths, DB schema, cache TTLs |
+| [Development Guide](docs/development.md) | Setup, env vars, coding conventions |
 | [Workflow](docs/workflow.md) | Git branching, commit conventions, PR checklist |
 | [ADR-001](docs/adrs/001-go-over-rust.md) | Go over Rust — language choice |
-| [ADR-002](docs/adrs/002-feature-flag-over-branches.md) | Feature flags over branches for comparison |
+| [ADR-002](docs/adrs/002-feature-flags-over-branches.md) | Feature flags over branches for comparison |
 | [ADR-003](docs/adrs/003-pgbouncer-connection-pooling.md) | PgBouncer for connection pooling |
 | [ADR-004](docs/adrs/004-redis-caching-strategy.md) | Cache-aside pattern with Redis |
 | [ADR-005](docs/adrs/005-async-write-via-queue.md) | Async writes via message queue |
-
----
-
-## Testing
-
-```bash
-# Unit tests
-go test ./...
-
-# Integration tests (requires docker compose up)
-go test -tags=integration ./...
-
-# Load tests
-k6 run scripts/load-test/mixed.js
-k6 run scripts/load-test/optimized.js
-```
+| [Cloud Demo Runbook](deployments/terraform/cloud-demo/README-cloud-demo.md) | Terraform apply, verify, and teardown steps |
 
 ---
 
