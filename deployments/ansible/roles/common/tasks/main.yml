@@ -16,6 +16,7 @@
       - git
       - gnupg
       - lsb-release
+      - python3-apt
     state: present
   become: true
 
@@ -38,6 +39,11 @@
     groups: docker
     append: true
   become: true
+  register: docker_group_update
+
+- name: Reset SSH connection after docker group update
+  ansible.builtin.meta: reset_connection
+  when: docker_group_update.changed
 
 - name: Create Docker CLI plugins directory
   ansible.builtin.file:

@@ -29,7 +29,7 @@
 
 - name: Pull latest Docker images
   ansible.builtin.command:
-    cmd: docker compose --profile optimized --profile observability pull
+    cmd: docker compose --profile optimized --profile observability pull --ignore-buildable
     chdir: "{{ app_dir }}"
   become: false
   register: pull_result

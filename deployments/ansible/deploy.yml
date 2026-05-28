@@ -10,6 +10,7 @@
 - name: Deploy latest app to app server
   hosts: app_servers
   gather_facts: false
+  serial: 1
 
   tasks:
     - name: Pull latest code
@@ -30,7 +31,7 @@
 
     - name: Pull latest Docker images
       ansible.builtin.command:
-        cmd: docker compose --profile optimized --profile observability pull
+        cmd: docker compose --profile optimized --profile observability pull --ignore-buildable
         chdir: "{{ app_dir }}"
       register: pull_out
       changed_when: "'Pull complete' in pull_out.stdout or 'Downloaded' in pull_out.stdout"
