@@ -14,8 +14,10 @@
   <img src="https://img.shields.io/badge/Kubernetes-K8s-326CE5?style=flat-square&logo=kubernetes&logoColor=white" />
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white" />
   <img src="https://img.shields.io/badge/Terraform-AWS-7B42BC?style=flat-square&logo=terraform&logoColor=white" />
+  <img src="https://img.shields.io/badge/Ansible-Automation-EE0000?style=flat-square&logo=ansible&logoColor=white" />
   <img src="https://img.shields.io/badge/Prometheus-Grafana-E6522C?style=flat-square&logo=prometheus&logoColor=white" />
   <img src="https://img.shields.io/badge/k6-Load%20Testing-7D64FF?style=flat-square&logo=k6&logoColor=white" />
+  <img src="https://github.com/egayurcel990/banking-peak-load-prototype/actions/workflows/cicd.yaml/badge.svg?branch=main&style=flat-square" />
 </p>
 
 ---
@@ -50,6 +52,15 @@ This prototype demonstrates how **four layered protection mechanisms** bring the
 ![k8s k6](docs/k8s-k6.png)
 
 ### Cloud (AWS EC2) Load Test
+
+| Metric | Baseline | Optimized | Improvement |
+|---|---|---|---|
+| p95 Latency (read) | > 2s | **3.5ms** | >570× faster |
+| p95 Latency (write) | > 5s | **5.5ms** | >900× faster |
+| Error Rate at peak | > 20% | **0.00%** | — |
+| Max TPS | < 100 | **~300 req/s** | 3× throughput |
+| Cache Hit Rate | N/A | **> 80%** | — |
+| Availability | — | **100%** | — |
 
 **Grafana dashboard — Cloud:**
 
@@ -120,7 +131,7 @@ Client Request
 | Message Queue | RabbitMQ 3 |
 | Observability | Prometheus v3 + Grafana 12 |
 | Load Testing | k6 |
-| Infrastructure | Docker Compose (profile-based) + Kubernetes + Terraform (AWS) |
+| Infrastructure | Docker Compose (profile-based) + Kubernetes + Terraform (AWS) + Ansible |
 | CI | GitHub Actions |
 | Dev tooling | air (live reload), golangci-lint, Nix flake |
 
@@ -290,12 +301,14 @@ make k8s-seed              # terminal 2
 
 ---
 
-## Cloud Demo (AWS via Terraform)
+## Cloud Demo (AWS via Terraform + Ansible)
 
 The `deployments/terraform/cloud-demo/` module provisions two EC2 instances on AWS Learner Lab:
 
-- **App server** — Banking API + PostgreSQL + Redis + RabbitMQ + PgBouncer + Prometheus + Grafana, all via Docker Compose. Auto-seeds 100K accounts and 1M transactions on first boot.
+- **App server** — Banking API + PostgreSQL + Redis + RabbitMQ + PgBouncer + Prometheus + Grafana, all via Docker Compose.
 - **k6 runner** — Remote load generator.
+
+Ansible (`deployments/ansible/`) handles all post-provision configuration: installs Docker, deploys the stack, seeds data, installs k6, and templates runner scripts — replacing the original `user_data` shell scripts with idempotent, re-runnable playbooks.
 
 ### Prerequisites
 
@@ -312,50 +325,104 @@ aws sts get-caller-identity
 ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
 ```
 
+4. Install Ansible:
+
+```bash
+pip install ansible
+```
+
+> **WSL users:** always run Ansible from your Linux home directory (`~/`), not from `/mnt/...`. The Windows-mounted filesystem is world-writable and Ansible will ignore `ansible.cfg` from there.
+>
+> ```bash
+> cp -r /mnt/d/path/to/banking-peak-load-prototype ~/banking-peak-load-prototype
+> cd ~/banking-peak-load-prototype/deployments/ansible
+> ```
+
 ### Deploy
+
+**Step 1 — Provision EC2 instances with Terraform:**
 
 ```bash
 cd deployments/terraform/cloud-demo
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars: set aws_region, instance type, SSH key path, etc.
+# Edit terraform.tfvars:
+#   aws_region      = "ap-southeast-1"
+#   repo_url        = "https://github.com/<your-username>/banking-peak-load-prototype.git"
+#   public_key_path = "~/.ssh/id_rsa.pub"
+#   ssh_cidr        = "<your-public-ip>/32"   # curl ifconfig.me
 terraform init
 terraform apply
 ```
 
-Wait **5–10 minutes** for cloud-init to finish seeding data.
+**Step 2 — Verify Ansible can reach both hosts:**
+
+```bash
+cd deployments/ansible
+ansible all -i inventories/terraform_inventory.py -m ping
+# Expected: pong from app_server and k6_runner
+```
+
+**Step 3 — Full setup with Ansible (installs Docker, deploys stack, seeds data):**
+
+```bash
+ansible-playbook -i inventories/terraform_inventory.py site.yml -e seed=true
+```
+
+This runs three roles in order:
+
+| Role | What it does |
+|---|---|
+| `common` | Updates apt, installs Docker + Compose plugin, adds ubuntu to docker group |
+| `app_server` | Clones repo, templates `.env`, starts full optimized stack, seeds 100K accounts + 1M transactions, verifies counts |
+| `k6_runner` | Installs k6, clones repo, waits for app to be healthy, templates 4 runner scripts |
+
+Wait **8–12 minutes** for the full run to complete.
 
 ### Verify readiness
 
 ```bash
+# Dynamic inventory reads directly from Terraform output
+ansible-inventory -i inventories/terraform_inventory.py --list
+
 # Get URLs
-terraform output -raw api_url
-terraform output -raw grafana_url
-terraform output -raw prometheus_url
+terraform -chdir=deployments/terraform/cloud-demo output -raw api_url
+terraform -chdir=deployments/terraform/cloud-demo output -raw grafana_url
 
-# SSH into app server and check
-$(terraform output -raw ssh_app_command)
-cloud-init status --long
-ls -l /home/ubuntu/cloud-demo-ready
-cd banking-peak-load-prototype
-docker compose ps
-docker compose exec -T postgres psql -U postgres -d banking \
-  -c "SELECT COUNT(*) FROM accounts;"       # expected: 100000
-docker compose exec -T postgres psql -U postgres -d banking \
-  -c "SELECT COUNT(*) FROM transactions;"   # expected: 1000000
+# Open Grafana: http://<app_public_ip>:3000  (admin/admin)
 ```
-
-All services (`app`, `postgres`, `redis`, `rabbitmq`, `pgbouncer`, `prometheus`, `grafana`) should be `Up`.
 
 ### Run load test
 
 ```bash
-# Run mixed load test from the k6 runner
-$(terraform output -raw run_mixed_command)
+# From the k6 runner (scripts already templated by Ansible)
+ssh -i ~/.ssh/id_rsa ubuntu@<k6_public_ip> '/home/ubuntu/run-mixed.sh'
+ssh -i ~/.ssh/id_rsa ubuntu@<k6_public_ip> '/home/ubuntu/run-spike.sh'
 
-# Or SSH into the runner manually
-$(terraform output -raw ssh_k6_command)
-/home/ubuntu/run-mixed.sh
+# Or get the command directly from Terraform output
+$(terraform -chdir=deployments/terraform/cloud-demo output -raw run_mixed_command)
 ```
+
+### Rolling deploy (update code without re-provisioning)
+
+```bash
+# Pull latest code, rebuild app container only, health-check automatically
+ansible-playbook -i inventories/terraform_inventory.py deploy.yml
+```
+
+### Reseed database
+
+```bash
+# Truncate and reseed without touching any other service
+ansible-playbook -i inventories/terraform_inventory.py seed.yml
+```
+
+### Ansible playbooks reference
+
+| Playbook | Description |
+|---|---|
+| `site.yml` | Full setup — runs once after `terraform apply`. Installs Docker, deploys stack, optionally seeds data. |
+| `deploy.yml` | Rolling update — pulls latest code, rebuilds app container, health-checks. Safe to re-run. |
+| `seed.yml` | Reseed only — truncates and reseeds 100K accounts + 1M transactions. |
 
 ### Makefile shortcuts (after copying .env.cloud)
 
@@ -374,7 +441,7 @@ make cloud-cleanup     # Stop all services on app server
 
 ```bash
 # On app server
-$(terraform output -raw ssh_app_command)
+ssh -i ~/.ssh/id_rsa ubuntu@<app_public_ip>
 docker compose logs app --tail=80
 curl http://localhost:8080/metrics | head
 curl http://localhost:9090/-/ready
@@ -387,6 +454,7 @@ curl "http://localhost:9090/api/v1/query?query=banking_api_requests_total"
 ### Destroy
 
 ```bash
+cd deployments/terraform/cloud-demo
 terraform destroy
 ```
 
@@ -447,15 +515,15 @@ terraform destroy
 
 ## SLO Targets
 
-| Metric | Baseline | Target | Achieved |
-|---|---|---|---|
-| p95 Latency (read) | > 2s | < 500ms | **1.85ms** ✅ |
-| p95 Latency (write) | > 5s | < 2s | **4.08ms** ✅ |
-| Error Rate at peak | > 20% | < 1% | **0.00%** ✅ |
-| Read Success Rate | < 80% | > 99% | **100%** ✅ |
-| Write Success Rate | < 80% | > 99% | **100%** ✅ |
-| Cache Hit Rate | N/A | > 80% | **> 80%** ✅ |
-| Availability | — | 99.5% | **100%** ✅ |
+| Metric | Baseline | Target | Achieved (K8s) | Achieved (Cloud) |
+|---|---|---|---|---|
+| p95 Latency (read) | > 2s | < 500ms | **1.85ms** ✅ | **3.5ms** ✅ |
+| p95 Latency (write) | > 5s | < 2s | **4.08ms** ✅ | **5.5ms** ✅ |
+| Error Rate at peak | > 20% | < 1% | **0.00%** ✅ | **0.00%** ✅ |
+| Read Success Rate | < 80% | > 99% | **100%** ✅ | **100%** ✅ |
+| Write Success Rate | < 80% | > 99% | **100%** ✅ | **100%** ✅ |
+| Cache Hit Rate | N/A | > 80% | **> 80%** ✅ | **> 80%** ✅ |
+| Availability | — | 99.5% | **100%** ✅ | **100%** ✅ |
 
 ---
 
@@ -484,6 +552,18 @@ banking-peak-load-prototype/
 │   ├── docker/Dockerfile
 │   ├── k8s/                       # Kubernetes manifests (full stack)
 │   ├── terraform/cloud-demo/      # Terraform: AWS EC2 app server + k6 runner
+│   ├── ansible/                   # Ansible: post-provision setup, deploy, seed
+│   │   ├── site.yml               # Full setup playbook (runs once after terraform apply)
+│   │   ├── deploy.yml             # Rolling deploy playbook (idempotent)
+│   │   ├── seed.yml               # Standalone reseed playbook
+│   │   ├── ansible.cfg            # SSH tuning, pipelining, dynamic inventory
+│   │   ├── group_vars/            # Per-group variables (app_servers, k6_runners)
+│   │   ├── inventories/
+│   │   │   └── terraform_inventory.py  # Dynamic inventory — reads terraform output
+│   │   └── roles/
+│   │       ├── common/            # Docker + Compose install, group membership
+│   │       ├── app_server/        # Clone repo, .env template, stack up, seed
+│   │       └── k6_runner/         # k6 install, repo clone, runner script templates
 │   ├── pgbouncer/                 # pgbouncer.ini + userlist.txt
 │   ├── postgres/                  # pg_hba.conf
 │   ├── prometheus/                # prometheus.yml
