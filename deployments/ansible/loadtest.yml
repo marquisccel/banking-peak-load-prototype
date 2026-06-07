@@ -27,7 +27,7 @@
         fail_msg: "Invalid loadtest_script '{{ loadtest_script }}'. Use one of: {{ allowed_loadtest_scripts | join(', ') }}"
 
     - name: Stop any previous k6 run before starting a new load test
-      ansible.builtin.shell: "pkill -f 'k6 run' || true"
+      ansible.builtin.shell: "pkill -f '[k]6 run' || true"
       changed_when: false
       when: loadtest_script != "run-status.sh"
 

@@ -221,7 +221,7 @@ This refreshes the app repo and k6 runner scripts without recreating EC2.
 Use this only if a demo is currently running and you need to stop it:
 
 ```bash
-ansible k6_runners -i inventories/terraform_inventory.py -m shell -a "pkill -f 'k6 run' || true"
+ansible k6_runners -i inventories/terraform_inventory.py -m shell -a "pkill -f '[k]6 run' || true"
 ```
 
 Check that no k6 process is still running:
