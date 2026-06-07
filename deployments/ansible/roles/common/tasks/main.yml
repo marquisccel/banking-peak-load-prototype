@@ -2,6 +2,10 @@
 # roles/common/tasks/main.yml
 # Common base setup for both app server and k6 runner.
 
+- name: Prepare Ansible remote temp directory for become tasks
+  ansible.builtin.raw: sudo mkdir -p /root/.ansible/tmp && sudo chmod 700 /root/.ansible /root/.ansible/tmp
+  changed_when: false
+
 - name: Update apt cache
   ansible.builtin.apt:
     update_cache: true
@@ -43,7 +47,6 @@
 
 - name: Reset SSH connection after docker group update
   ansible.builtin.meta: reset_connection
-  when: docker_group_update.changed
 
 - name: Create Docker CLI plugins directory
   ansible.builtin.file:
