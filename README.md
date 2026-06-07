@@ -335,7 +335,7 @@ pip install ansible
 >
 > ```bash
 > cp -r /mnt/d/path/to/banking-peak-load-prototype ~/banking-peak-load-prototype
-> cd ~/banking-peak-load-prototype/deployments/ansible
+> cd ~/banking-peak-load-prototype
 > ```
 
 ### Deploy
@@ -349,15 +349,21 @@ cp terraform.tfvars.example terraform.tfvars
 #   aws_region      = "ap-southeast-1"
 #   repo_url        = "https://github.com/<your-username>/banking-peak-load-prototype.git"
 #   public_key_path = "~/.ssh/id_rsa.pub"
-#   ssh_cidr        = "<your-public-ip>/32"   # curl ifconfig.me
+#   ssh_cidr        = "<your-public-ip>/32"   # curl -4 ifconfig.me
 terraform init
 terraform apply
+```
+
+If your public IP changes, re-apply from this Terraform directory:
+
+```bash
+terraform apply -var="ssh_cidr=$(curl -4 -s ifconfig.me)/32"
 ```
 
 **Step 2 — Verify Ansible can reach both hosts:**
 
 ```bash
-cd deployments/ansible
+cd ../../ansible
 ansible all -i inventories/terraform_inventory.py -m ping
 # Expected: pong from app_server and k6_runner
 ```
@@ -385,8 +391,8 @@ Wait **8–12 minutes** for the full run to complete.
 ansible-inventory -i inventories/terraform_inventory.py --list
 
 # Get URLs
-terraform -chdir=deployments/terraform/cloud-demo output -raw api_url
-terraform -chdir=deployments/terraform/cloud-demo output -raw grafana_url
+terraform -chdir=../terraform/cloud-demo output -raw api_url
+terraform -chdir=../terraform/cloud-demo output -raw grafana_url
 
 # Open Grafana: http://<app_public_ip>:3000  (admin/admin)
 ```
@@ -399,7 +405,7 @@ ssh -i ~/.ssh/id_rsa ubuntu@<k6_public_ip> '/home/ubuntu/run-mixed.sh'
 ssh -i ~/.ssh/id_rsa ubuntu@<k6_public_ip> '/home/ubuntu/run-spike.sh'
 
 # Or get the command directly from Terraform output
-$(terraform -chdir=deployments/terraform/cloud-demo output -raw run_mixed_command)
+$(terraform -chdir=../terraform/cloud-demo output -raw run_mixed_command)
 ```
 
 ### Rolling deploy (update code without re-provisioning)

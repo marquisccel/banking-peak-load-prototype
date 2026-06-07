@@ -22,18 +22,48 @@ ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
 
 ## Apply
 
+Run these commands from the repository root:
+
 ```bash
 cd deployments/terraform/cloud-demo
 cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars:
+#   aws_region      = "us-east-1" # or your AWS Learner Lab region
+#   repo_url        = "https://github.com/<your-username>/banking-peak-load-prototype.git"
+#   public_key_path = "~/.ssh/id_rsa.pub"
+#   ssh_cidr        = "<your-public-ip>/32"   # curl -4 ifconfig.me
 terraform init
 terraform apply
 ```
 
-Wait 5-10 minutes after apply. The app server seeds 100,000 accounts and 1,000,000 transactions automatically.
+If your public IP changes, re-apply from this Terraform directory:
+
+```bash
+terraform apply -var="ssh_cidr=$(curl -4 -s ifconfig.me)/32"
+```
+
+Verify Ansible can reach both hosts:
+
+```bash
+cd ../../ansible
+ansible all -i inventories/terraform_inventory.py -m ping
+# Expected: pong from app_server and k6_runner
+```
+
+Configure both servers with Ansible:
+
+```bash
+ansible-playbook -i inventories/terraform_inventory.py site.yml
+```
+
+Wait 5-10 minutes after Ansible finishes for cloud-init and the app stack to settle.
 
 ## Verify app server
 
 ```bash
+# Return to the Terraform directory for terraform output commands
+cd ../terraform/cloud-demo
+
 terraform output -raw api_url
 terraform output -raw grafana_url
 terraform output -raw prometheus_url
