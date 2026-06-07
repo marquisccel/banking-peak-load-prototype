@@ -32,8 +32,8 @@
       when: loadtest_script != "run-status.sh"
 
     - name: Wait for previous k6 process to exit
-      ansible.builtin.pause:
-        seconds: 2
+      ansible.builtin.command: sleep 2
+      changed_when: false
       when: loadtest_script != "run-status.sh"
 
     - name: Run selected k6 script
