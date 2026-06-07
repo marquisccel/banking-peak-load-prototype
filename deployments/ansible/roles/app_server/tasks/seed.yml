@@ -29,7 +29,7 @@
               NOW()
             FROM generate_series(0, 999999) AS i;"
     chdir: "{{ app_dir }}"
-  become: false
+  become: true
   register: seed_result
 
 - name: Print seed output

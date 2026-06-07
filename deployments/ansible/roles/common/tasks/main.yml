@@ -45,9 +45,6 @@
   become: true
   register: docker_group_update
 
-- name: Reset SSH connection after docker group update
-  ansible.builtin.meta: reset_connection
-
 - name: Create Docker CLI plugins directory
   ansible.builtin.file:
     path: /usr/local/lib/docker/cli-plugins
@@ -76,5 +73,6 @@
 
 - name: Verify Docker Compose
   ansible.builtin.command: docker compose version
+  become: true
   register: docker_compose_check
   changed_when: false

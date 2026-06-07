@@ -5,5 +5,5 @@
   ansible.builtin.command:
     cmd: docker compose restart app
     chdir: "{{ app_dir }}"
-  become: false
+  become: true
   listen: Restart app

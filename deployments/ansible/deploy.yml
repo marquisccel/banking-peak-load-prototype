@@ -33,6 +33,7 @@
       ansible.builtin.command:
         cmd: docker compose --profile optimized --profile observability pull --ignore-buildable
         chdir: "{{ app_dir }}"
+      become: true
       register: pull_out
       changed_when: "'Pull complete' in pull_out.stdout or 'Downloaded' in pull_out.stdout"
 
@@ -40,6 +41,7 @@
       ansible.builtin.command:
         cmd: docker compose up -d --build --no-deps app
         chdir: "{{ app_dir }}"
+      become: true
 
     - name: Wait for app to be healthy
       ansible.builtin.uri:

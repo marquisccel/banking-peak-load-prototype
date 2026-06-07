@@ -8,7 +8,7 @@
       -U postgres -d banking -t
       -c "SELECT COUNT(*) FROM accounts;"
     chdir: "{{ app_dir }}"
-  become: false
+  become: true
   register: account_count
   changed_when: false
 
@@ -19,7 +19,7 @@
       -U postgres -d banking -t
       -c "SELECT COUNT(*) FROM transactions;"
     chdir: "{{ app_dir }}"
-  become: false
+  become: true
   register: tx_count
   changed_when: false
 

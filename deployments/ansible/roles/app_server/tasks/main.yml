@@ -31,7 +31,7 @@
   ansible.builtin.command:
     cmd: docker compose --profile optimized --profile observability pull --ignore-buildable
     chdir: "{{ app_dir }}"
-  become: false
+  become: true
   register: pull_result
   changed_when: "'Pull complete' in pull_result.stdout or 'Downloaded' in pull_result.stdout"
 
@@ -39,7 +39,7 @@
   ansible.builtin.command:
     cmd: docker compose --profile optimized --profile observability up -d --build
     chdir: "{{ app_dir }}"
-  become: false
+  become: true
   register: compose_up
 
 - name: Wait for API metrics endpoint to be ready
@@ -63,7 +63,7 @@
   ansible.builtin.command:
     cmd: docker compose restart app prometheus grafana
     chdir: "{{ app_dir }}"
-  become: false
+  become: true
   when: seed | default(false) | bool
 
 - name: Wait for API to be ready after restart

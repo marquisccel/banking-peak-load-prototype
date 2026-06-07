@@ -25,6 +25,7 @@
       ansible.builtin.command:
         cmd: docker compose restart app prometheus grafana
         chdir: "{{ app_dir }}"
+      become: true
 
     - name: Wait for app to be healthy
       ansible.builtin.uri:
