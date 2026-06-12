@@ -13,6 +13,26 @@
   serial: 1
 
   tasks:
+    - name: Check existing repo directory
+      ansible.builtin.stat:
+        path: "{{ app_dir }}"
+      register: app_repo_dir
+
+    - name: Repair existing repo ownership
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        owner: ubuntu
+        group: ubuntu
+        recurse: true
+      become: true
+      when: app_repo_dir.stat.exists
+
+    - name: Trust existing repo directory for Git
+      ansible.builtin.command:
+        cmd: git config --global --add safe.directory "{{ app_dir }}"
+      changed_when: false
+      when: app_repo_dir.stat.exists
+
     - name: Pull latest code
       ansible.builtin.git:
         repo: "{{ repo_url }}"
@@ -73,6 +93,26 @@
   gather_facts: false
 
   tasks:
+    - name: Check existing repo directory
+      ansible.builtin.stat:
+        path: "{{ app_dir }}"
+      register: k6_repo_dir
+
+    - name: Repair existing repo ownership
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        owner: ubuntu
+        group: ubuntu
+        recurse: true
+      become: true
+      when: k6_repo_dir.stat.exists
+
+    - name: Trust existing repo directory for Git
+      ansible.builtin.command:
+        cmd: git config --global --add safe.directory "{{ app_dir }}"
+      changed_when: false
+      when: k6_repo_dir.stat.exists
+
     - name: Pull latest code
       ansible.builtin.git:
         repo: "{{ repo_url }}"

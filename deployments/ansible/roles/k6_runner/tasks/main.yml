@@ -32,6 +32,26 @@
     state: present
   become: true
 
+- name: Check existing repo directory
+  ansible.builtin.stat:
+    path: "{{ app_dir }}"
+  register: k6_repo_dir
+
+- name: Repair existing repo ownership
+  ansible.builtin.file:
+    path: "{{ app_dir }}"
+    owner: ubuntu
+    group: ubuntu
+    recurse: true
+  become: true
+  when: k6_repo_dir.stat.exists
+
+- name: Trust existing repo directory for Git
+  ansible.builtin.command:
+    cmd: git config --global --add safe.directory "{{ app_dir }}"
+  changed_when: false
+  when: k6_repo_dir.stat.exists
+
 - name: Clone or update repo on k6 runner
   ansible.builtin.git:
     repo: "{{ repo_url }}"
