@@ -9,11 +9,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/marquisccel/banking-peak-load-prototype/internal/domain/transaction"
 	"github.com/marquisccel/banking-peak-load-prototype/internal/infrastructure/queue"
 	"github.com/marquisccel/banking-peak-load-prototype/internal/logger"
 	"github.com/marquisccel/banking-peak-load-prototype/internal/metrics"
-	"github.com/jmoiron/sqlx"
 	"github.com/redis/go-redis/v9"
 )
 

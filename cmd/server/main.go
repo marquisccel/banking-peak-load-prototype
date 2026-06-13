@@ -8,6 +8,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jmoiron/sqlx"
+	echoprometheus "github.com/labstack/echo-prometheus"
+	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 	"github.com/marquisccel/banking-peak-load-prototype/internal/config"
 	"github.com/marquisccel/banking-peak-load-prototype/internal/domain/account"
 	"github.com/marquisccel/banking-peak-load-prototype/internal/domain/transaction"
@@ -22,10 +26,6 @@ import (
 	pgrepo "github.com/marquisccel/banking-peak-load-prototype/internal/repository/postgres"
 	"github.com/marquisccel/banking-peak-load-prototype/internal/service"
 	"github.com/marquisccel/banking-peak-load-prototype/internal/worker"
-	"github.com/jmoiron/sqlx"
-	echoprometheus "github.com/labstack/echo-prometheus"
-	"github.com/labstack/echo/v5"
-	"github.com/labstack/echo/v5/middleware"
 	"github.com/redis/go-redis/v9"
 )
 

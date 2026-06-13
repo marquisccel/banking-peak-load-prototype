@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/marquisccel/banking-peak-load-prototype/internal/service"
 	"github.com/labstack/echo/v5"
+	"github.com/marquisccel/banking-peak-load-prototype/internal/service"
 )
 
 type AccountHandler struct {

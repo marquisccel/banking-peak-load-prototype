@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/labstack/echo/v5"
 	"github.com/marquisccel/banking-peak-load-prototype/internal/config"
 	"github.com/marquisccel/banking-peak-load-prototype/internal/metrics"
-	"github.com/labstack/echo/v5"
 	"github.com/sony/gobreaker"
 )
 

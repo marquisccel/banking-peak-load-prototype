@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/marquisccel/banking-peak-load-prototype/internal/domain/account"
 	"github.com/jmoiron/sqlx"
+	"github.com/marquisccel/banking-peak-load-prototype/internal/domain/account"
 )
 
 type AccountRepository struct {

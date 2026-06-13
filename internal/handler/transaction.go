@@ -4,10 +4,10 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/labstack/echo/v5"
 	"github.com/marquisccel/banking-peak-load-prototype/internal/domain/transaction"
 	"github.com/marquisccel/banking-peak-load-prototype/internal/handler/request"
 	"github.com/marquisccel/banking-peak-load-prototype/internal/service"
-	"github.com/labstack/echo/v5"
 )
 
 type TransactionHandler struct {

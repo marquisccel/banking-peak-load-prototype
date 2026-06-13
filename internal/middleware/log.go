@@ -3,8 +3,8 @@ package middleware
 import (
 	"time"
 
-	"github.com/marquisccel/banking-peak-load-prototype/internal/logger"
 	"github.com/labstack/echo/v5"
+	"github.com/marquisccel/banking-peak-load-prototype/internal/logger"
 )
 
 // RequestLogger returns an Echo middleware that implements the wide event /
