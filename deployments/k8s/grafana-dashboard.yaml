@@ -168,10 +168,100 @@ data:
           ]
         },
         {
+          "id": 14,
+          "title": "Load Test Profile",
+          "type": "text",
+          "gridPos": { "h": 4, "w": 8, "x": 0, "y": 5 },
+          "options": {
+            "mode": "markdown",
+            "content": "### Mixed peak workload\nTarget **300 iter/s** for **10 minutes**  \nRead/write mix: balance inquiry, transaction create, transaction status"
+          }
+        },
+        {
+          "id": 15,
+          "title": "SLO: P95 < 500ms",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 8, "x": 8, "y": 5 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0,
+              "mappings": [
+                { "type": "value", "options": { "0": { "text": "FAIL" }, "1": { "text": "PASS" } } }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              },
+              "color": { "mode": "thresholds" }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "orientation": "auto",
+            "textMode": "auto",
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center"
+          },
+          "targets": [
+            {
+              "expr": "(histogram_quantile(0.95, sum(rate(banking_api_request_duration_seconds_bucket{url!=\"/metrics\"}[1m])) by (le)) < bool 0.5) or vector(1)",
+              "legendFormat": "P95 SLO",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 16,
+          "title": "SLO: Error Rate < 1%",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 8, "x": 16, "y": 5 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0,
+              "mappings": [
+                { "type": "value", "options": { "0": { "text": "FAIL" }, "1": { "text": "PASS" } } }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              },
+              "color": { "mode": "thresholds" }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "orientation": "auto",
+            "textMode": "auto",
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center"
+          },
+          "targets": [
+            {
+              "expr": "(((sum(rate(banking_api_requests_total{url!=\"/metrics\",code=~\"4..|5..\"}[1m])) or vector(0)) / clamp_min(sum(rate(banking_api_requests_total{url!=\"/metrics\"}[1m])), 0.001)) < bool 0.01) or vector(1)",
+              "legendFormat": "Error SLO",
+              "refId": "A"
+            }
+          ]
+        },
+        {
           "id": 5,
-          "title": "Request Rate by HTTP Code",
+          "title": "HTTP Status Distribution",
           "type": "timeseries",
-          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 5 },
+          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 9 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
@@ -198,7 +288,7 @@ data:
           "id": 6,
           "title": "Request Rate by Endpoint",
           "type": "timeseries",
-          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 5 },
+          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 9 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
@@ -225,7 +315,7 @@ data:
           "id": 7,
           "title": "Average Latency by Endpoint",
           "type": "timeseries",
-          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 12 },
+          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 16 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
@@ -252,7 +342,7 @@ data:
           "id": 8,
           "title": "P95 Latency by Endpoint",
           "type": "timeseries",
-          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 12 },
+          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 16 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
@@ -279,7 +369,7 @@ data:
           "id": 9,
           "title": "Dependency Health",
           "type": "timeseries",
-          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 19 },
+          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 23 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
@@ -308,7 +398,7 @@ data:
           "id": 10,
           "title": "Application Memory Usage",
           "type": "timeseries",
-          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 19 },
+          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 23 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
@@ -340,7 +430,7 @@ data:
           "id": 11,
           "title": "CPU & Memory Utilization",
           "type": "timeseries",
-          "gridPos": { "h": 7, "w": 16, "x": 0, "y": 26 },
+          "gridPos": { "h": 7, "w": 16, "x": 0, "y": 30 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
@@ -374,7 +464,7 @@ data:
           "id": 12,
           "title": "Resource Utilization (Bar)",
           "type": "bargauge",
-          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 26 },
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 30 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
@@ -409,7 +499,7 @@ data:
           "id": 13,
           "title": "Prometheus Scrape Requests",
           "type": "timeseries",
-          "gridPos": { "h": 7, "w": 24, "x": 0, "y": 33 },
+          "gridPos": { "h": 5, "w": 24, "x": 0, "y": 37 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
@@ -435,12 +525,12 @@ data:
       ],
       "refresh": "5s",
       "schemaVersion": 38,
-      "tags": ["banking", "peak-load", "monitoring", "fixed"],
+      "tags": ["banking", "peak-load", "monitoring", "slo"],
       "templating": { "list": [] },
       "time": { "from": "now-30m", "to": "now" },
       "timepicker": {},
       "timezone": "browser",
-      "title": "Banking Peak Load Monitor - Fixed",
+      "title": "Core Banking API Peak Load Monitor",
       "uid": "banking-peak-load-fixed",
       "version": 4
     }
