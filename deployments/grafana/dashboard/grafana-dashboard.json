@@ -22,7 +22,7 @@
   "timezone": "browser",
   "title": "Banking Peak Load Monitor - Fixed",
   "uid": "banking-peak-load",
-  "version": 4,
+  "version": 5,
   "refresh": "5s",
   "panels": [
     {
@@ -325,7 +325,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(banking_api_requests_total{url!=\"/metrics\"}[1m])) by (code)",
+          "expr": "sum(rate(banking_api_requests_total{url!=\"/metrics\"}[1m])) by (code) or label_replace(vector(0), \"code\", \"200\", \"__name__\", \".*\") or label_replace(vector(0), \"code\", \"400\", \"__name__\", \".*\") or label_replace(vector(0), \"code\", \"404\", \"__name__\", \".*\") or label_replace(vector(0), \"code\", \"500\", \"__name__\", \".*\") or label_replace(vector(0), \"code\", \"503\", \"__name__\", \".*\")",
           "legendFormat": "HTTP {{ code }}",
           "refId": "A"
         }
@@ -721,11 +721,11 @@
               },
               {
                 "color": "yellow",
-                "value": 0.7
+                "value": 0.05
               },
               {
                 "color": "red",
-                "value": 0.9
+                "value": 0.1
               }
             ]
           },

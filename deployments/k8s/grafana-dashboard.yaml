@@ -188,7 +188,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(rate(banking_api_requests_total{url!=\"/metrics\"}[1m])) by (code)",
+              "expr": "sum(rate(banking_api_requests_total{url!=\"/metrics\"}[1m])) by (code) or label_replace(vector(0), \"code\", \"200\", \"__name__\", \".*\") or label_replace(vector(0), \"code\", \"400\", \"__name__\", \".*\") or label_replace(vector(0), \"code\", \"404\", \"__name__\", \".*\") or label_replace(vector(0), \"code\", \"500\", \"__name__\", \".*\") or label_replace(vector(0), \"code\", \"503\", \"__name__\", \".*\")",
               "legendFormat": "HTTP {{ code }}",
               "refId": "A"
             }
@@ -381,7 +381,7 @@ data:
               "unit": "percentunit",
               "min": 0,
               "max": 1,
-              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.7 }, { "color": "red", "value": 0.9 } ] },
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.05 }, { "color": "red", "value": 0.1 } ] },
               "color": { "mode": "thresholds" }
             },
             "overrides": []
