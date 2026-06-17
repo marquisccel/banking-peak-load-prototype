@@ -12,12 +12,55 @@ data:
 
     scrape_configs:
       - job_name: "banking-api"
-
         metrics_path: /metrics
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names:
+                - banking
+        relabel_configs:
+          - source_labels:
+              - __meta_kubernetes_namespace
+              - __meta_kubernetes_service_name
+              - __meta_kubernetes_endpoint_port_name
+            regex: banking;banking-app;http
+            action: keep
 
-        static_configs:
-          - targets:
-              - banking-app:8080
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: banking
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prometheus-discovery
+  namespace: banking
+
+rules:
+  - apiGroups: [""]
+    resources: ["endpoints", "pods", "services"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus-discovery
+  namespace: banking
+
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: banking
+
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus-discovery
 
 ---
 apiVersion: apps/v1
@@ -39,6 +82,8 @@ spec:
         app: prometheus
 
     spec:
+      serviceAccountName: prometheus
+
       containers:
         - name: prometheus
           image: prom/prometheus:v3.4.0
