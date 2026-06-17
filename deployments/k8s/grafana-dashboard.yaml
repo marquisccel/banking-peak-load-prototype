@@ -298,7 +298,7 @@ data:
           },
           "targets": [
             {
-              "expr": "dependency_up",
+              "expr": "min by (dependency) (dependency_up)",
               "legendFormat": "{{ dependency }}",
               "refId": "A"
             }
