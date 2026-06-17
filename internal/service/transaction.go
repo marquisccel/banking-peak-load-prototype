@@ -20,10 +20,9 @@ import (
 var ErrInsufficientFunds = errors.New("insufficient funds")
 var ErrAccountNotFound = errors.New("account not found")
 
-// txCounter is used to generate sequential transaction IDs matching the
-// seeded format: txn<22-digit-zero-padded-number> (e.g. txn0000000000000000000001).
-// This ensures mixed.js transaction status queries can find transactions created
-// by the app during load tests.
+// txCounter makes generated transaction IDs monotonic inside one process.
+// The timestamp base keeps IDs above the seeded transaction range even after
+// an app restart, avoiding primary-key collisions during repeated demos.
 var txCounter atomic.Int64
 
 type CreateTransactionInput struct {
@@ -70,12 +69,8 @@ func (s *transactionService) CreateTransaction(ctx context.Context, input Create
 
 	now := time.Now()
 
-	// Generate ID in txn<22-digit> format to match seeded data and mixed.js queries.
-	// Counter starts after seeded transaction range to avoid ID collisions.
-
-	seq := int64(1_000_000) + txCounter.Add(1)
 	tx := &transaction.Transaction{
-		ID:            fmt.Sprintf("txn%022d", seq),
+		ID:            nextTransactionID(),
 		SourceAccount: input.SourceAccount,
 		DestAccount:   input.DestAccount,
 		Amount:        input.Amount,
@@ -104,6 +99,20 @@ func (s *transactionService) CreateTransaction(ctx context.Context, input Create
 	logger.Set(ctx, "transaction_id", tx.ID)
 	logger.Set(ctx, "transaction_status", tx.Status)
 	return tx, nil
+}
+
+func nextTransactionID() string {
+	for {
+		now := time.Now().UnixNano()
+		last := txCounter.Load()
+		next := now
+		if next <= last {
+			next = last + 1
+		}
+		if txCounter.CompareAndSwap(last, next) {
+			return fmt.Sprintf("txn%022d", next)
+		}
+	}
 }
 
 // createSync executes an atomic DB transaction: balance check → debit → credit → insert.
