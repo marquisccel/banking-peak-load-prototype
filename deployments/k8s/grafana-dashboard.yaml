@@ -50,7 +50,7 @@ data:
           },
           "targets": [
             {
-              "expr": "round(sum(rate(banking_api_requests_total{url!=\"/metrics\"}[5m])))",
+              "expr": "round(sum(rate(banking_api_requests_total{url!=\"/metrics\"}[1m])) or vector(0))",
               "legendFormat": "TPS",
               "refId": "A"
             }
@@ -87,7 +87,7 @@ data:
           },
           "targets": [
             {
-              "expr": "histogram_quantile(0.95, sum(rate(banking_api_request_duration_seconds_bucket{url!=\"/metrics\"}[5m])) by (le))",
+              "expr": "histogram_quantile(0.95, sum(rate(banking_api_request_duration_seconds_bucket{url!=\"/metrics\"}[1m])) by (le))",
               "legendFormat": "P95",
               "refId": "A"
             }
@@ -124,7 +124,7 @@ data:
           },
           "targets": [
             {
-              "expr": "(sum(rate(banking_api_requests_total{code=~\"4..|5..\"}[5m])) or vector(0))/sum(rate(banking_api_requests_total[5m]))",
+              "expr": "(sum(rate(banking_api_requests_total{url!=\"/metrics\",code=~\"4..|5..\"}[1m])) or vector(0)) / clamp_min(sum(rate(banking_api_requests_total{url!=\"/metrics\"}[1m])), 0.001)",
               "legendFormat": "Error Rate",
               "refId": "A"
             }
@@ -188,7 +188,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(rate(banking_api_requests_total{url!=\"/metrics\"}[5m])) by (code)",
+              "expr": "sum(rate(banking_api_requests_total{url!=\"/metrics\"}[1m])) by (code)",
               "legendFormat": "HTTP {{ code }}",
               "refId": "A"
             }
@@ -215,7 +215,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(rate(banking_api_requests_total{url!=\"/metrics\"}[5m])) by (url)",
+              "expr": "sum(rate(banking_api_requests_total{url!=\"/metrics\"}[1m])) by (url)",
               "legendFormat": "{{ url }}",
               "refId": "A"
             }
@@ -242,7 +242,7 @@ data:
           },
           "targets": [
             {
-              "expr": "(sum(rate(banking_api_request_duration_seconds_sum{url!=\"/metrics\"}[5m])) by (url) / clamp_min(sum(rate(banking_api_request_duration_seconds_count{url!=\"/metrics\"}[5m])) by (url), 0.001)) * 1000",
+              "expr": "(sum(rate(banking_api_request_duration_seconds_sum{url!=\"/metrics\"}[1m])) by (url) / clamp_min(sum(rate(banking_api_request_duration_seconds_count{url!=\"/metrics\"}[1m])) by (url), 0.001)) * 1000",
               "legendFormat": "{{ url }}",
               "refId": "A"
             }
@@ -269,7 +269,7 @@ data:
           },
           "targets": [
             {
-              "expr": "histogram_quantile(0.95, sum(rate(banking_api_request_duration_seconds_bucket{url!=\"/metrics\"}[5m])) by (le, url))",
+              "expr": "histogram_quantile(0.95, sum(rate(banking_api_request_duration_seconds_bucket{url!=\"/metrics\"}[1m])) by (le, url))",
               "legendFormat": "{{ url }}",
               "refId": "A"
             }
