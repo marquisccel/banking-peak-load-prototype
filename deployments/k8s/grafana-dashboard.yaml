@@ -26,6 +26,7 @@ data:
           "fieldConfig": {
             "defaults": {
               "unit": "reqps",
+              "decimals": 0,
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
@@ -49,7 +50,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(rate(banking_api_requests_total{url!=\"/metrics\"}[5m]))",
+              "expr": "round(sum(rate(banking_api_requests_total{url!=\"/metrics\"}[5m])))",
               "legendFormat": "TPS",
               "refId": "A"
             }
@@ -160,8 +161,8 @@ data:
           },
           "targets": [
             {
-              "expr": "avg_over_time(up{job=\"banking-api\"}[5m])",
-              "legendFormat": "banking-api",
+              "expr": "avg(avg_over_time(up{job=\"banking-api\"}[5m]))",
+              "legendFormat": "Availability",
               "refId": "A"
             }
           ]
@@ -324,12 +325,12 @@ data:
           },
           "targets": [
             {
-              "expr": "app_memory_usage_bytes",
+              "expr": "sum(app_memory_usage_bytes)",
               "legendFormat": "Memory Used",
               "refId": "A"
             },
             {
-              "expr": "app_memory_limit_bytes",
+              "expr": "sum(app_memory_limit_bytes)",
               "legendFormat": "Memory Limit",
               "refId": "B"
             }
@@ -358,12 +359,12 @@ data:
           },
           "targets": [
             {
-              "expr": "app_cpu_utilization_ratio",
+              "expr": "avg(app_cpu_utilization_ratio)",
               "legendFormat": "CPU: API",
               "refId": "A"
             },
             {
-              "expr": "app_memory_utilization_ratio",
+              "expr": "avg(app_memory_utilization_ratio)",
               "legendFormat": "MEM: API",
               "refId": "B"
             }
@@ -393,12 +394,12 @@ data:
           },
           "targets": [
             {
-              "expr": "app_cpu_utilization_ratio",
+              "expr": "avg(app_cpu_utilization_ratio)",
               "legendFormat": "CPU: API",
               "refId": "A"
             },
             {
-              "expr": "app_memory_utilization_ratio",
+              "expr": "avg(app_memory_utilization_ratio)",
               "legendFormat": "MEM: API",
               "refId": "B"
             }
