@@ -55,13 +55,6 @@
   register: pull_result
   changed_when: "'Pull complete' in pull_result.stdout or 'Downloaded' in pull_result.stdout"
 
-- name: Stop existing stack before full startup
-  ansible.builtin.command:
-    cmd: docker compose --profile optimized --profile observability down --remove-orphans
-    chdir: "{{ app_dir }}"
-  become: true
-  changed_when: false
-
 - name: Start full stack (optimized + observability)
   ansible.builtin.command:
     cmd: docker compose --profile optimized --profile observability up -d --build
