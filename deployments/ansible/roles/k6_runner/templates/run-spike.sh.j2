@@ -24,7 +24,7 @@ cleanup() {
 
 trap cleanup INT TERM HUP EXIT
 
-env BASE_URL="{{ app_base_url }}" k6 run scripts/load-test/spike.js &
+env BASE_URL="{{ app_base_url }}" k6 run --no-color scripts/load-test/spike.js &
 K6_PID=$!
 
 set +e

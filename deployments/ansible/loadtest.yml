@@ -42,7 +42,7 @@
       ansible.builtin.command:
         argv:
           - ssh
-          - -tt
+          - -T
           - -i
           - "{{ ansible_ssh_private_key_file }}"
           - -o
@@ -52,11 +52,18 @@
           - -o
           - LogLevel=ERROR
           - "{{ ansible_user }}@{{ ansible_host }}"
-          - "/home/ubuntu/{{ loadtest_script }}"
+          - "NO_COLOR=1 K6_NO_COLOR=1 TERM=dumb /home/ubuntu/{{ loadtest_script }}"
       delegate_to: localhost
       register: loadtest_result
       changed_when: loadtest_script != "run-status.sh"
 
-    - name: Print k6 output
+    - name: Print k6 summary
       ansible.builtin.debug:
-        var: loadtest_result.stdout_lines
+        msg:
+          - "Load test finished successfully."
+          - "{{ loadtest_result.stdout_lines | select('search', '^\\s*http_req_failed') | list | last | default('http_req_failed: n/a') | regex_replace('\\x1b\\[[0-9;]*[A-Za-z]', '') }}"
+          - "{{ loadtest_result.stdout_lines | select('search', '^\\s*http_reqs') | list | last | default('http_reqs: n/a') | regex_replace('\\x1b\\[[0-9;]*[A-Za-z]', '') }}"
+          - "{{ loadtest_result.stdout_lines | select('search', '^\\s*iterations') | list | last | default('iterations: n/a') | regex_replace('\\x1b\\[[0-9;]*[A-Za-z]', '') }}"
+          - "{{ loadtest_result.stdout_lines | select('search', '^\\s*read_latency') | list | last | default('read_latency: n/a') | regex_replace('\\x1b\\[[0-9;]*[A-Za-z]', '') }}"
+          - "{{ loadtest_result.stdout_lines | select('search', '^\\s*write_latency') | list | last | default('write_latency: n/a') | regex_replace('\\x1b\\[[0-9;]*[A-Za-z]', '') }}"
+          - "{{ loadtest_result.stdout_lines | select('search', '^running \\(') | list | last | default('duration: n/a') | regex_replace('\\x1b\\[[0-9;]*[A-Za-z]', '') }}"
