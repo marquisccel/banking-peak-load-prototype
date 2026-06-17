@@ -42,6 +42,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
+          "decimals": 0,
           "color": {
             "mode": "palette-classic"
           },
@@ -67,7 +68,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(banking_api_requests_total{url!=\"/metrics\"}[1m])) or vector(0)",
+          "expr": "round(sum(rate(banking_api_requests_total{url!=\"/metrics\"}[1m])) or vector(0))",
           "legendFormat": "TPS",
           "refId": "A"
         }
@@ -211,7 +212,7 @@
       },
       "targets": [
         {
-          "expr": "avg_over_time(up{job=\"banking-api\"}[5m])",
+          "expr": "avg(avg_over_time(up{job=\"banking-api\"}[5m]))",
           "legendFormat": "Availability",
           "refId": "A"
         }
@@ -257,7 +258,7 @@
       "targets": [
         {
           "expr": "sum(rate(banking_api_requests_total{url!=\"/metrics\"}[1m])) by (code)",
-          "legendFormat": "HTTP {{code}}",
+          "legendFormat": "HTTP {{ code }}",
           "refId": "A"
         }
       ]
@@ -302,7 +303,7 @@
       "targets": [
         {
           "expr": "sum(rate(banking_api_requests_total{url!=\"/metrics\"}[1m])) by (url)",
-          "legendFormat": "{{url}}",
+          "legendFormat": "{{ url }}",
           "refId": "A"
         }
       ]
@@ -347,7 +348,7 @@
       "targets": [
         {
           "expr": "(sum(rate(banking_api_request_duration_seconds_sum{url!=\"/metrics\"}[1m])) by (url) / clamp_min(sum(rate(banking_api_request_duration_seconds_count{url!=\"/metrics\"}[1m])) by (url), 0.001)) * 1000",
-          "legendFormat": "{{url}}",
+          "legendFormat": "{{ url }}",
           "refId": "A"
         }
       ]
@@ -368,7 +369,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "ms",
+          "unit": "s",
           "color": {
             "mode": "palette-classic"
           },
@@ -391,8 +392,8 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(banking_api_request_duration_seconds_bucket{url!=\"/metrics\"}[1m])) by (le, url)) * 1000",
-          "legendFormat": "{{url}}",
+          "expr": "histogram_quantile(0.95, sum(rate(banking_api_request_duration_seconds_bucket{url!=\"/metrics\"}[1m])) by (le, url))",
+          "legendFormat": "{{ url }}",
           "refId": "A"
         }
       ]
@@ -436,8 +437,8 @@
       },
       "targets": [
         {
-          "expr": "dependency_up",
-          "legendFormat": "{{dependency}}",
+          "expr": "min by (dependency) (dependency_up)",
+          "legendFormat": "{{ dependency }}",
           "refId": "A"
         }
       ]
@@ -481,12 +482,12 @@
       },
       "targets": [
         {
-          "expr": "app_memory_usage_bytes",
+          "expr": "sum(app_memory_usage_bytes)",
           "legendFormat": "Memory Used",
           "refId": "A"
         },
         {
-          "expr": "app_memory_limit_bytes",
+          "expr": "sum(app_memory_limit_bytes)",
           "legendFormat": "Memory Limit",
           "refId": "B"
         }
@@ -531,13 +532,13 @@
       },
       "targets": [
         {
-          "expr": "app_cpu_utilization_ratio",
-          "legendFormat": "CPU",
+          "expr": "avg(app_cpu_utilization_ratio)",
+          "legendFormat": "CPU: API",
           "refId": "A"
         },
         {
-          "expr": "app_memory_utilization_ratio",
-          "legendFormat": "Memory",
+          "expr": "avg(app_memory_utilization_ratio)",
+          "legendFormat": "MEM: API",
           "refId": "B"
         }
       ]
@@ -582,13 +583,13 @@
       },
       "targets": [
         {
-          "expr": "app_cpu_utilization_ratio",
-          "legendFormat": "CPU",
+          "expr": "avg(app_cpu_utilization_ratio)",
+          "legendFormat": "CPU: API",
           "refId": "A"
         },
         {
-          "expr": "app_memory_utilization_ratio",
-          "legendFormat": "Memory",
+          "expr": "avg(app_memory_utilization_ratio)",
+          "legendFormat": "MEM: API",
           "refId": "B"
         }
       ]
@@ -632,8 +633,8 @@
       },
       "targets": [
         {
-          "expr": "rate(promhttp_metric_handler_requests_total[1m])",
-          "legendFormat": "Scrape {{code}}",
+          "expr": "sum(rate(promhttp_metric_handler_requests_total[5m])) by (code)",
+          "legendFormat": "Scrape {{ code }}",
           "refId": "A"
         }
       ]
